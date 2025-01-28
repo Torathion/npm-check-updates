@@ -3,6 +3,7 @@ import { defaultCacheFile } from './lib/cache'
 import chalk from './lib/chalk'
 import { sortBy } from './lib/sortBy'
 import table from './lib/table'
+import { codeInlineIfMarkdown, getHighlightedKeywords, indentText } from './lib/utils/string'
 import CLIOption from './types/CLIOption'
 import ExtendedHelp from './types/ExtendedHelp'
 import { Index } from './types/IndexType'
@@ -10,16 +11,9 @@ import { Index } from './types/IndexType'
 /** Valid strings for the --target option. Indicates the desired version to upgrade to. */
 const supportedVersionTargets = ['latest', 'newest', 'greatest', 'minor', 'patch', 'semver']
 
-/** Pads the left side of each line in a string. */
-const padLeft = (s: string, n: number) =>
-  s
-    .split('\n')
-    .map(line => `${''.padStart(n, ' ')}${line}`)
-    .join('\n')
-
 /** Formats a code block for CLI or markdown. */
-const codeBlock = (code: string, { markdown }: { markdown?: boolean } = {}) =>
-  `${markdown ? '```js\n' : ''}${padLeft(code, markdown ? 0 : 4)}${markdown ? '\n```' : ''}`
+const codeBlock = (code: string, markdown?: boolean) =>
+  `${markdown ? '```js\n' : ''}${indentText(code, markdown ? 0 : 4)}${markdown ? '\n```' : ''}`
 
 /** Removes inline code ticks. */
 const uncode = (s: string) => s.replace(/`/g, '')
@@ -120,17 +114,18 @@ Example:
 /** Extended help for the filterResults option. */
 const extendedHelpFilterResults: ExtendedHelp = ({ markdown }) => {
   /** If markdown, surround inline code with backticks. */
-  const codeInline = (code: string) => (markdown ? `\`${code}\`` : code)
+  const filterResults = codeInlineIfMarkdown('filterResults', markdown)
+  const { keyConst, keyIf, keyReturn, keyTrue, keyAssign, keyAnd, keyLess, keyArrow } = getHighlightedKeywords()
 
   return `Filters out upgrades based on a user provided function.
 
-${codeInline('filterResults')} runs _after_ new versions are fetched, in contrast to ${codeInline(
+${filterResults} runs _after_ new versions are fetched, in contrast to ${codeInlineIfMarkdown(
     'filter',
-  )}, ${codeInline('reject')}, ${codeInline('filterVersion')}, and ${codeInline(
+    markdown,
+  )}, ${codeInlineIfMarkdown('reject', markdown)}, ${codeInlineIfMarkdown('filterVersion', markdown)}, and ${codeInlineIfMarkdown(
     'rejectVersion',
-  )}, which run _before_. This allows you to filter out upgrades with ${codeInline(
-    'filterResults',
-  )} based on how the version has changed (e.g. a major version change).
+    markdown,
+  )}, which run _before_. This allows you to filter out upgrades with ${filterResults} based on how the version has changed (e.g. a major version change).
 
 > :warning: The predicate function is only available in .ncurc.js or when importing npm-check-updates as a module, not on the command line. To convert a JSON config to a JS config, follow the instructions at https://github.com/raineorshine/npm-check-updates#config-functions.
 
@@ -143,19 +138,15 @@ ${codeBlock(
   @param {SemVer} upgradedVersionSemver     Upgraded version in semantic versioning format.
   @returns {boolean}                        Return true if the upgrade should be kept, otherwise it will be ignored.
 */`)}
-${chalk.green('filterResults')}: (packageName, { current, currentVersionSemver, upgraded, upgradedVersionSemver }) ${chalk.cyan(
-    '=>',
-  )} {
-  ${chalk.cyan('const')} currentMajor ${chalk.red('=')} parseInt(currentVersionSemver[${chalk.cyan('0')}]?.major, ${chalk.cyan(
-    '10',
-  )})
-  ${chalk.cyan('const')} upgradedMajor ${chalk.red('=')} parseInt(upgradedVersionSemver?.major, ${chalk.cyan('10')})
-  ${chalk.red('if')} (currentMajor ${chalk.red('&&')} upgradedMajor) {
-    ${chalk.red('return')} currentMajor ${chalk.red('<')} upgradedMajor
+${chalk.green('filterResults')}: (packageName, { current, currentVersionSemver, upgraded, upgradedVersionSemver }) ${keyArrow} {
+  ${keyConst} currentMajor ${keyAssign} parseInt(currentVersionSemver[${chalk.cyan('0')}]?.major, ${chalk.cyan('10')})
+  ${keyConst} upgradedMajor ${keyAssign} parseInt(upgradedVersionSemver?.major, ${chalk.cyan('10')})
+  ${keyIf} (currentMajor ${keyAnd} upgradedMajor) {
+    ${keyReturn} currentMajor ${keyLess} upgradedMajor
   }
-  ${chalk.red('return')} ${chalk.cyan('true')}
+  ${keyReturn} ${keyTrue}
 }`,
-  { markdown },
+  markdown,
 )}
 
 For the SemVer type definition, see: https://git.coolaj86.com/coolaj86/semver-utils.js#semverutils-parse-semverstring
@@ -180,7 +171,7 @@ const extendedHelpFormat: ExtendedHelp = ({ markdown }) => {
     ],
   })
 
-  return `${header}\n\n${padLeft(tableString, markdown ? 0 : 4)}
+  return `${header}\n\n${indentText(tableString, markdown ? 0 : 4)}
 `
 }
 
@@ -200,21 +191,20 @@ const extendedHelpInstall: ExtendedHelp = ({ markdown }) => {
     ],
   })
 
-  return `${header}\n\n${padLeft(tableString, markdown ? 0 : 4)}
+  return `${header}\n\n${indentText(tableString, markdown ? 0 : 4)}
 `
 }
 
 /** Extended help for the --filter option. */
 const extendedHelpFilterFunction: ExtendedHelp = ({ markdown }) => {
-  /** If markdown, surround inline code with backticks. */
-  const codeInline = (code: string) => (markdown ? `\`${code}\`` : code)
-
-  return `Include only package names matching the given string, wildcard, glob, comma-or-space-delimited list, /regex/, or predicate function. Only included packages will be checked with ${codeInline(
+  const { keyIf, keyArrow, keyReturn, keyTrue, keyFalse } = getHighlightedKeywords()
+  return `Include only package names matching the given string, wildcard, glob, comma-or-space-delimited list, /regex/, or predicate function. Only included packages will be checked with ${codeInlineIfMarkdown(
     '--peer',
   )}.
 
-${codeInline('--filter')} runs _before_ new versions are fetched, in contrast to ${codeInline(
+${codeInlineIfMarkdown('--filter', markdown)} runs _before_ new versions are fetched, in contrast to ${codeInlineIfMarkdown(
     '--filterResults',
+    markdown,
   )} which runs _after_.
 
 You can also specify a custom function in your .ncurc.js file, or when importing npm-check-updates as a module.
@@ -228,13 +218,13 @@ ${codeBlock(
     (See: https://git.coolaj86.com/coolaj86/semver-utils.js#semverutils-parse-semverstring)
   @returns        True if the package should be included, false if it should be excluded.
 */`)}
-${chalk.green('filter')}: (name, semver) ${chalk.cyan('=>')} {
-  ${chalk.red('if')} (name.startsWith(${chalk.yellow(`'@myorg/'`)})) {
-    ${chalk.red('return')} ${chalk.cyan('false')}
+${chalk.green('filter')}: (name, semver) ${keyArrow} {
+  ${keyIf} (name.startsWith(${chalk.yellow(`'@myorg/'`)})) {
+    ${keyReturn} ${keyFalse}
   }
-  ${chalk.red('return')} ${chalk.cyan('true')}
+  ${keyReturn} ${keyTrue}
 }`,
-  { markdown },
+  markdown,
 )}
 
 `
@@ -243,17 +233,18 @@ ${chalk.green('filter')}: (name, semver) ${chalk.cyan('=>')} {
 /** Extended help for the --filterVersion option. */
 const extendedHelpFilterVersionFunction: ExtendedHelp = ({ markdown }) => {
   /** If markdown, surround inline code with backticks. */
-  const codeInline = (code: string) => (markdown ? `\`${code}\`` : code)
+  const { keyArrow, keyIf, keyAnd, keyReturn, keyGreater, keyFalse, keyTrue } = getHighlightedKeywords()
 
   return `Include only versions matching the given string, wildcard, glob, comma-or-space-delimited list, /regex/, or predicate function.
 
-${codeInline('--filterVersion')} runs _before_ new versions are fetched, in contrast to ${codeInline(
+${codeInlineIfMarkdown('--filterVersion', true)} runs _before_ new versions are fetched, in contrast to ${codeInlineIfMarkdown(
     '--filterResults',
+    true,
   )} which runs _after_.
 
 You can also specify a custom function in your .ncurc.js file, or when importing npm-check-updates as a module.
 
-> :warning: The predicate function is only available in .ncurc.js or when importing npm-check-updates as a module, not on the command line. To convert a JSON config to a JS config, follow the instructions at https://github.com/raineorshine/npm-check-updates#config-functions. This function is an alias for the ${codeInline('filter')} option function.
+> :warning: The predicate function is only available in .ncurc.js or when importing npm-check-updates as a module, not on the command line. To convert a JSON config to a JS config, follow the instructions at https://github.com/raineorshine/npm-check-updates#config-functions. This function is an alias for the ${codeInlineIfMarkdown('filter', markdown)} option function.
 
 ${codeBlock(
   `${chalk.gray(`/**
@@ -262,15 +253,13 @@ ${codeBlock(
     (See: https://git.coolaj86.com/coolaj86/semver-utils.js#semverutils-parse-semverstring)
   @returns        True if the package should be included, false if it should be excluded.
 */`)}
-${chalk.green('filterVersion')}: (name, semver) ${chalk.cyan('=>')} {
-  ${chalk.red('if')} (name.startsWith(${chalk.yellow(`'@myorg/'`)}) ${chalk.red(
-    '&&',
-  )} parseInt(semver[0]?.major) ${chalk.cyan('>')} ${chalk.cyan(`5`)}) {
-    ${chalk.red('return')} ${chalk.cyan('false')}
+${chalk.green('filterVersion')}: (name, semver) ${keyArrow} {
+  ${keyIf} (name.startsWith(${chalk.yellow(`'@myorg/'`)}) ${keyAnd} parseInt(semver[0]?.major) ${keyGreater} ${chalk.cyan(`5`)}) {
+    ${keyReturn} ${keyFalse}
   }
-  ${chalk.red('return')} ${chalk.cyan('true')}
+  ${keyReturn} ${keyTrue}
 }`,
-  { markdown },
+  markdown,
 )}
 
 `
@@ -278,17 +267,19 @@ ${chalk.green('filterVersion')}: (name, semver) ${chalk.cyan('=>')} {
 
 /** Extended help for the --reject option. */
 const extendedHelpRejectFunction: ExtendedHelp = ({ markdown }) => {
-  /** If markdown, surround inline code with backticks. */
-  const codeInline = (code: string) => (markdown ? `\`${code}\`` : code)
+  const { keyArrow, keyIf, keyReturn, keyTrue, keyFalse } = getHighlightedKeywords()
 
-  return `The inverse of ${codeInline(
+  return `The inverse of ${codeInlineIfMarkdown(
     '--filter',
-  )}. Exclude package names matching the given string, wildcard, glob, comma-or-space-delimited list, /regex/, or predicate function. This will also exclude them from the ${codeInline(
+    markdown,
+  )}. Exclude package names matching the given string, wildcard, glob, comma-or-space-delimited list, /regex/, or predicate function. This will also exclude them from the ${codeInlineIfMarkdown(
     '--peer',
+    markdown,
   )} check.
 
-${codeInline('--reject')} runs _before_ new versions are fetched, in contrast to ${codeInline(
+${codeInlineIfMarkdown('--reject', markdown)} runs _before_ new versions are fetched, in contrast to ${codeInlineIfMarkdown(
     '--filterResults',
+    markdown,
   )} which runs _after_.
 
 You can also specify a custom function in your .ncurc.js file, or when importing npm-check-updates as a module.
@@ -302,13 +293,13 @@ ${codeBlock(
     (See: https://git.coolaj86.com/coolaj86/semver-utils.js#semverutils-parse-semverstring)
   @returns        True if the package should be excluded, false if it should be included.
 */`)}
-${chalk.green('reject')}: (name, semver) ${chalk.cyan('=>')} {
-  ${chalk.red('if')} (name.startsWith(${chalk.yellow(`'@myorg/'`)})) {
-    ${chalk.red('return')} ${chalk.cyan('true')}
+${chalk.green('reject')}: (name, semver) ${keyArrow} {
+  ${keyIf} (name.startsWith(${chalk.yellow(`'@myorg/'`)})) {
+    ${keyReturn} ${keyTrue}
   }
-  ${chalk.red('return')} ${chalk.cyan('false')}
+  ${keyReturn} ${keyFalse}
 }`,
-  { markdown },
+  markdown,
 )}
 
 `
@@ -316,15 +307,16 @@ ${chalk.green('reject')}: (name, semver) ${chalk.cyan('=>')} {
 
 /** Extended help for the --rejectVersion option. */
 const extendedHelpRejectVersionFunction: ExtendedHelp = ({ markdown }) => {
-  /** If markdown, surround inline code with backticks. */
-  const codeInline = (code: string) => (markdown ? `\`${code}\`` : code)
+  const { keyArrow, keyIf, keyAnd, keyGreater, keyReturn, keyTrue, keyFalse } = getHighlightedKeywords()
 
-  return `The inverse of ${codeInline(
+  return `The inverse of ${codeInlineIfMarkdown(
     '--filterVersion',
+    markdown,
   )}. Exclude versions matching the given string, wildcard, glob, comma-or-space-delimited list, /regex/, or predicate function.
 
-${codeInline('--rejectVersion')} runs _before_ new versions are fetched, in contrast to ${codeInline(
+${codeInlineIfMarkdown('--rejectVersion', markdown)} runs _before_ new versions are fetched, in contrast to ${codeInlineIfMarkdown(
     '--filterResults',
+    markdown,
   )} which runs _after_.
 
 You can also specify a custom function in your .ncurc.js file, or when importing npm-check-updates as a module.
@@ -338,15 +330,13 @@ ${codeBlock(
     (See: https://git.coolaj86.com/coolaj86/semver-utils.js#semverutils-parse-semverstring)
   @returns        True if the package should be excluded, false if it should be included.
 */`)}
-${chalk.green('rejectVersion')}: (name, semver) ${chalk.cyan('=>')} {
-  ${chalk.red('if')} (name.startsWith(${chalk.yellow(`'@myorg/'`)}) ${chalk.red(
-    '&&',
-  )} parseInt(semver[0]?.major) ${chalk.cyan('>')} ${chalk.cyan(`5`)}) {
-    ${chalk.red('return')} ${chalk.cyan('true')}
+${chalk.green('rejectVersion')}: (name, semver) ${keyArrow} {
+  ${keyIf} (name.startsWith(${chalk.yellow(`'@myorg/'`)}) ${keyAnd} parseInt(semver[0]?.major) ${keyGreater} ${chalk.cyan(`5`)}) {
+    ${keyReturn} ${keyTrue}
   }
-  ${chalk.red('return')} ${chalk.cyan('false')}
+  ${keyReturn} ${keyFalse}
 }`,
-  { markdown },
+  markdown,
 )}
 
 `
@@ -354,6 +344,7 @@ ${chalk.green('rejectVersion')}: (name, semver) ${chalk.cyan('=>')} {
 
 /** Extended help for the --group option. */
 const extendedHelpGroupFunction: ExtendedHelp = ({ markdown }) => {
+  const { keyArrow, keyIf, keyEq, keyAnd, keyReturn } = getHighlightedKeywords()
   return `Customize how packages are divided into groups when using \`--format group\`.
 
 Only available in .ncurc.js or when importing npm-check-updates as a module, not on the command line. To convert a JSON config to a JS config, follow the instructions at https://github.com/raineorshine/npm-check-updates#config-functions.
@@ -367,18 +358,16 @@ ${codeBlock(
   @param upgradedVersion  The upgraded version number returned by the registry.
   @returns                A predefined group name ('major' | 'minor' | 'patch' | 'majorVersionZero' | 'none') or a custom string to create your own group.
 */`)}
-${chalk.green('groupFunction')}: (name, defaultGroup, currentSpec, upgradedSpec, upgradedVersion) ${chalk.cyan('=>')} {
-  ${chalk.red('if')} (name ${chalk.red('===')} ${chalk.yellow(`'typescript'`)} ${chalk.red(
-    '&&',
-  )} defaultGroup ${chalk.red('===')} ${chalk.yellow(`'minor'`)}) {
-    ${chalk.red('return')} ${chalk.yellow(`'major'`)}
+${chalk.green('groupFunction')}: (name, defaultGroup, currentSpec, upgradedSpec, upgradedVersion) ${keyArrow} {
+  ${keyIf} (name ${keyEq} ${chalk.yellow(`'typescript'`)} ${keyAnd} defaultGroup ${keyEq} ${chalk.yellow(`'minor'`)}) {
+    ${keyReturn} ${chalk.yellow(`'major'`)}
   }
-  ${chalk.red('if')} (name.startsWith(${chalk.yellow(`'@myorg/'`)})) {
-    ${chalk.red('return')} ${chalk.yellow(`'My Org'`)}
+  ${keyIf} (name.startsWith(${chalk.yellow(`'@myorg/'`)})) {
+    ${keyReturn} ${chalk.yellow(`'My Org'`)}
   }
-  ${chalk.red('return')} defaultGroup
+  ${keyReturn} defaultGroup
 }`,
-  { markdown },
+  markdown,
 )}
 
 `
@@ -386,6 +375,7 @@ ${chalk.green('groupFunction')}: (name, defaultGroup, currentSpec, upgradedSpec,
 
 /** Extended help for the --target option. */
 const extendedHelpTarget: ExtendedHelp = ({ markdown }) => {
+  const { keyIf, keyArrow, keyEq, keyReturn } = getHighlightedKeywords()
   const header = 'Determines the version to upgrade to. (default: "latest")'
   const tableString = table({
     colAligns: ['right', 'left'],
@@ -412,7 +402,7 @@ const extendedHelpTarget: ExtendedHelp = ({ markdown }) => {
 
   return `${header}
 
-${padLeft(tableString, markdown ? 0 : 4)}
+${indentText(tableString, markdown ? 0 : 4)}
 
 e.g.
 
@@ -429,13 +419,13 @@ ${codeBlock(
     (See: https://git.coolaj86.com/coolaj86/semver-utils.js#semverutils-parse-semverstring)
   @returns        One of the valid target values (specified in the table above).
 */`)}
-${chalk.green('target')}: (name, semver) ${chalk.cyan('=>')} {
-  ${chalk.red('if')} (parseInt(semver[0]?.major) ${chalk.red('===')} ${chalk.yellow("'0'")}) ${chalk.red(
+${chalk.green('target')}: (name, semver) ${keyArrow} {
+  ${keyIf} (parseInt(semver[0]?.major) ${keyEq} ${chalk.yellow("'0'")}) ${chalk.red(
     'return',
   )} ${chalk.yellow("'minor'")}
-  ${chalk.red('return')} ${chalk.yellow("'latest'")}
+  ${keyReturn} ${chalk.yellow("'latest'")}
 }`,
-  { markdown },
+  markdown,
 )}
 `
 }
@@ -454,16 +444,14 @@ const extendedHelpPackageManager: ExtendedHelp = ({ markdown }) => {
     ],
   })
 
-  return `${header}\n\n${padLeft(tableString, markdown ? 0 : 4)}
+  return `${header}\n\n${indentText(tableString, markdown ? 0 : 4)}
 `
 }
 
 /** Extended help for the --registryType option. */
 const extendedHelpRegistryType: ExtendedHelp = ({ markdown }) => {
-  /** If markdown, surround inline code with backticks. */
-  const codeInline = (code: string) => (markdown ? `\`${code}\`` : code)
-
-  const header = `Specify whether ${codeInline('--registry')} refers to a full npm registry or a simple JSON file.`
+  const { keyDollar } = getHighlightedKeywords()
+  const header = `Specify whether ${codeInlineIfMarkdown('--registry', markdown)} refers to a full npm registry or a simple JSON file.`
   const tableString = table({
     colAligns: ['right', 'left'],
     markdown,
@@ -478,14 +466,14 @@ const extendedHelpRegistryType: ExtendedHelp = ({ markdown }) => {
 Example:
 
     ${chalk.gray('// local file')}
-    ${chalk.cyan('$')} ncu --registryType json --registry ./registry.json
+    ${keyDollar} ncu --registryType json --registry ./registry.json
 
     ${chalk.gray('// url')}
-    ${chalk.cyan('$')} ncu --registryType json --registry https://api.mydomain/registry.json
+    ${keyDollar} ncu --registryType json --registry https://api.mydomain/registry.json
 
     ${chalk.gray('// you can omit --registryType when the registry ends in .json')}
-    ${chalk.cyan('$')} ncu --registry ./registry.json
-    ${chalk.cyan('$')} ncu --registry https://api.mydomain/registry.json
+    ${keyDollar} ncu --registry ./registry.json
+    ${keyDollar} ncu --registry https://api.mydomain/registry.json
 
 registry.json:
 
@@ -499,14 +487,12 @@ registry.json:
     ],
   })
 
-  return `${header}\n\n${padLeft(tableString, markdown ? 0 : 4)}
+  return `${header}\n\n${indentText(tableString, markdown ? 0 : 4)}
 `
 }
 
 /** Extended help for the --peer option. */
 const extendedHelpPeer: ExtendedHelp = ({ markdown }) => {
-  /** If markdown, surround inline code with backticks. */
-  const codeInline = (code: string) => (markdown ? `\`${code}\`` : code)
   return `Check peer dependencies of installed packages and filter updates to compatible versions.
 
 ${chalk.bold('Example')}:
@@ -515,8 +501,8 @@ The following example demonstrates how \`--peer\` works, and how it uses peer de
 
 The package ${chalk.bold('ncu-test-peer-update')} has two versions published:
 
-- 1.0.0 has peer dependency ${codeInline('"ncu-test-return-version": "1.0.x"')}
-- 1.1.0 has peer dependency ${codeInline('"ncu-test-return-version": "1.1.x"')}
+- 1.0.0 has peer dependency ${codeInlineIfMarkdown('"ncu-test-return-version": "1.0.x"', markdown)}
+- 1.1.0 has peer dependency ${codeInlineIfMarkdown('"ncu-test-return-version": "1.1.x"', markdown)}
 
 Our test app has the following dependencies:
 
@@ -544,6 +530,8 @@ As a comparison: without using the \`--peer\` option, ncu will suggest the lates
 `
 }
 
+const parseIntMapper = (s: string) => parseInt(s, 10)
+
 // store CLI options separately from bin file so that they can be used to build type definitions
 const cliOptions: CLIOption[] = [
   {
@@ -560,7 +548,7 @@ const cliOptions: CLIOption[] = [
     long: 'cacheExpiration',
     arg: 'min',
     description: 'Cache expiration in minutes. Only works with `--cache`.',
-    parse: s => parseInt(s, 10),
+    parse: parseIntMapper,
     default: 10,
     type: 'number',
   },
@@ -581,7 +569,7 @@ const cliOptions: CLIOption[] = [
     long: 'concurrency',
     arg: 'n',
     description: 'Max number of concurrent HTTP requests to registry.',
-    parse: s => parseInt(s, 10),
+    parse: parseIntMapper,
     default: 8,
     type: 'number',
   },
@@ -656,7 +644,7 @@ const cliOptions: CLIOption[] = [
     arg: 'n',
     description:
       'Set the error level. 1: exits with error code 0 if no errors occur. 2: exits with error code 0 if no packages need updating (useful for continuous integration).',
-    parse: s => parseInt(s, 10),
+    parse: parseIntMapper,
     default: 1,
     type: 'number',
   },
@@ -852,7 +840,7 @@ const cliOptions: CLIOption[] = [
     long: 'retry',
     arg: 'n',
     description: 'Number of times to retry failed requests for package info.',
-    parse: s => parseInt(s, 10),
+    parse: parseIntMapper,
     default: 3,
     type: 'number',
   },
@@ -880,7 +868,7 @@ const cliOptions: CLIOption[] = [
     long: 'timeout',
     arg: 'ms',
     description: 'Global timeout in milliseconds. (default: no global timeout and 30 seconds per npm-registry-fetch)',
-    parse: s => parseInt(s, 10),
+    parse: parseIntMapper,
     type: 'number',
   },
   {
