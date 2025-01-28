@@ -17,6 +17,7 @@ import mergeOptions from './lib/mergeOptions'
 import programError from './lib/programError'
 import runGlobal from './lib/runGlobal'
 import runLocal from './lib/runLocal'
+import { isString } from './lib/utils/string'
 import { Index } from './types/IndexType'
 import { Options } from './types/Options'
 import { PackageFile } from './types/PackageFile'
@@ -309,7 +310,7 @@ export async function run(
   let timeout: NodeJS.Timeout | undefined
   let timeoutPromise: Promise<void> = new Promise(() => null)
   if (options.timeout) {
-    const timeoutMs = typeof options.timeout === 'string' ? Number.parseInt(options.timeout, 10) : options.timeout
+    const timeoutMs = isString(options.timeout) ? Number.parseInt(options.timeout, 10) : options.timeout
     timeoutPromise = new Promise((resolve, reject) => {
       timeout = setTimeout(() => {
         // must catch the error and reject explicitly since we are in a setTimeout

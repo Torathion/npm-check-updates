@@ -9,11 +9,9 @@ import { chalkInit } from '../lib/chalk'
 // async global contexts are only available in esm modules -> function
 import getNcuRc from '../lib/getNcuRc'
 import { pickBy } from '../lib/pick'
+import { isString, uncode } from '../lib/utils/string'
 
 const optionVersionDescription = 'Output the version number of npm-check-updates.'
-
-/** Removes inline code ticks. */
-const uncode = (s: string) => s.replace(/`/g, '')
 
 const cloneDeep = createCloneDeep()
 
@@ -190,8 +188,8 @@ ${chalk.dim.underline(
   // override rc args with program args
   const rcArgs = (rcResult?.args || []).filter(
     (arg, i, args) =>
-      (typeof arg !== 'string' || !arg.startsWith('-') || !programArgs.includes(arg)) &&
-      (typeof args[i - 1] !== 'string' || !args[i - 1].startsWith('-') || !programArgs.includes(args[i - 1])),
+      (!isString(arg) || arg[0] !== '-' || !programArgs.includes(arg)) &&
+      (!isString(args[i - 1]) || args[i - 1][0] !== '-' || !programArgs.includes(args[i - 1])),
   )
 
   // insert config arguments into command line arguments so they can all be parsed by commander

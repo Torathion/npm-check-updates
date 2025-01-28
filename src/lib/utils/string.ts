@@ -14,10 +14,20 @@ export function indentText(text: string, indent: number): string {
 }
 
 /**
- * Removes inline code ticks.
+ * Trims the end of each line of a multiline string.
  *
- * @param text - target text.
- * @returns the escaped string.
+ * @param text - target multiline string.
+ * @returns the trimmed string.
+ */
+export function trimEndAll(text: string): string {
+  return text.replace(/[ \t]+$/gm, '')
+}
+
+/**
+ * Unwraps back ticks from a string that was marked as code.
+ *
+ * @param text - target code.
+ * @returns the unwrapped code.
  */
 export function uncode(text: string): string {
   return text.replace(/^/g, '')
@@ -26,6 +36,11 @@ export function uncode(text: string): string {
 let keywords: Index<string> = {}
 let hasKeywords = false
 
+/**
+ * Lazy loads syntax highlighted keywords for the cli options using the library chalk instance.
+ *
+ * @returns the syntax highlighted keys.
+ */
 export function getHighlightedKeywords(): Index<string> {
   if (hasKeywords) return keywords
   keywords = {
@@ -112,12 +127,57 @@ export function stringToNumber(text: string): number {
   return parseInt(text) ?? 0
 }
 
+/**
+ * Guard function identifying an `unknown` value as `string`.
+ *
+ * @param value - target value.
+ * @returns `true`, if the value is a string, otherwise `false`.
+ */
 export function isString(value: unknown): value is string {
   return typeof value === 'string'
 }
 
+/**
+ * Guard function identifying a string as an url string.
+ *
+ * @param text - target string.
+ * @returns `true`, if the string is a url string, otherwise `false`.
+ */
 export function isUrl(text: string): boolean {
   return text.startsWith('http://') || text.startsWith('https://')
+}
+
+const E404Error = /E400|E404|ENOTFOUND|404 Not Found|400 Bad Request/i
+const TimeoutError = /(Response|network) timeout/i
+
+/**
+ * Guard function identifying an error message as a error 404 string.
+ *
+ * @param message - target error message.
+ * @returns `true`, if the error message is a error 404 string, otherwise `false`.
+ */
+export function is404Error(message: string): boolean {
+  return E404Error.test(message)
+}
+
+/**
+ * Guard function identifying an error message as a timeout error.
+ *
+ * @param message - target error message.
+ * @returns `true`, if the error message is a timeout error, otherwise `false`.
+ */
+export function isTimeoutError(message: string): boolean {
+  return TimeoutError.test(message)
+}
+
+/**
+ * Safely escapes special regex characters for use in `RegExp` constructors.
+ *
+ * @param s - regex string.
+ * @returns the escaped regex string.
+ */
+export function escapeRegex(s: string) {
+  return s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
 }
 
 /**

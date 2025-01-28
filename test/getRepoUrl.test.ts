@@ -4,14 +4,14 @@ import chaiSetup from './helpers/chaiSetup'
 const should = chaiSetup()
 
 describe('getRepoUrl', () => {
-  it('return null if package is not installed', async () => {
-    should.equal(await getRepoUrl('not-installed/package'), null)
+  it('return undefined if package is not installed', async () => {
+    should.equal(await getRepoUrl('not-installed/package'), undefined)
   })
-  it('return null repository field is undefined', async () => {
-    should.equal(await getRepoUrl('package-name', {}), null)
+  it('return undefined if repository field is undefined', async () => {
+    should.equal(await getRepoUrl('package-name', {}), undefined)
   })
-  it('return null repository field is unknown type', async () => {
-    should.equal(await getRepoUrl('package-name', { repository: true as any /* allow to compile */ }), null)
+  it('return undefined if repository field is unknown type', async () => {
+    should.equal(await getRepoUrl('package-name', { repository: true as any /* allow to compile */ }), undefined)
   })
   it('return url directly from repository field if valid https url', async () => {
     const url = await getRepoUrl('package-name', { repository: 'https://github.com/user/repo' })

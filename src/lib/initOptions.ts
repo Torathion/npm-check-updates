@@ -12,18 +12,16 @@ import determinePackageManager from './determinePackageManager'
 import exists from './exists'
 import keyValueBy from './keyValueBy'
 import programError from './programError'
+import { isString } from './utils/string'
 
-function parseFilterExpression(filterExpression: string[] | undefined): string[] | undefined
-function parseFilterExpression(filterExpression: FilterPattern | undefined): FilterPattern | undefined
+function parseFilterExpression(filterExpression?: string[]): string[] | undefined
+function parseFilterExpression(filterExpression?: FilterPattern): FilterPattern | undefined
 /** Trims and filters out empty values from a filter expression. */
-function parseFilterExpression(filterExpression: FilterPattern | undefined): FilterPattern | undefined {
-  if (typeof filterExpression === 'string') {
+function parseFilterExpression(filterExpression?: FilterPattern): FilterPattern | undefined {
+  if (isString(filterExpression)) {
     return filterExpression.trim()
-  } else if (
-    Array.isArray(filterExpression) &&
-    (filterExpression.length === 0 || typeof filterExpression[0] === 'string')
-  ) {
-    const filtered = filterExpression.map(s => (typeof s === 'string' ? s.trim() : s)).filter(x => x)
+  } else if (Array.isArray(filterExpression) && (filterExpression.length === 0 || isString(filterExpression[0]))) {
+    const filtered = filterExpression.map(s => (isString(s) ? s.trim() : s)).filter(Boolean)
     return filtered.length > 0 ? filtered : undefined
   } else {
     return filterExpression

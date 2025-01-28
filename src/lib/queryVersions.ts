@@ -1,3 +1,4 @@
+import { isString } from 'lodash'
 import pMap from 'p-map'
 import ProgressBar from 'progress'
 import { parseRange } from 'semver-utils'
@@ -11,6 +12,7 @@ import { VersionSpec } from '../types/VersionSpec'
 import getPackageManager from './getPackageManager'
 import keyValueBy from './keyValueBy'
 import programError from './programError'
+import { is404Error, isTimeoutError } from './utils/string'
 import { createNpmAlias, isGithubUrl, isPre, parseNpmAlias } from './version-util'
 
 /**
@@ -20,11 +22,15 @@ import { createNpmAlias, isGithubUrl, isPre, parseNpmAlias } from './version-uti
  * @param [options={}] Options. Default: { target: 'latest' }.
  * @returns Promised {packageName: version} collection
  */
-async function queryVersions(packageMap: Index<VersionSpec>, options: Options = {}): Promise<Index<VersionResult>> {
+export default async function queryVersions(
+  packageMap: Index<VersionSpec>,
+  options: Options = {},
+): Promise<Index<VersionResult>> {
   const { default: chalkDefault, Chalk } = await import('chalk')
   const chalk = options.color ? new Chalk({ level: 1 }) : chalkDefault
   const packageList = Object.keys(packageMap)
   const globalPackageManager = getPackageManager(options, options.packageManager)
+  const cacher = options.cacher
 
   let bar: ProgressBar | undefined
   if (!options.json && options.loglevel !== 'silent' && options.loglevel !== 'verbose' && packageList.length > 0) {
@@ -43,12 +49,11 @@ async function queryVersions(packageMap: Index<VersionSpec>, options: Options = 
     const npmAlias = parseNpmAlias(packageMap[dep])
     const [name, version] = npmAlias || [dep, packageMap[dep]]
     const targetOption = options.target || 'latest'
-    const targetString = typeof targetOption === 'string' ? targetOption : targetOption(name, parseRange(version))
-    const [target, distTag] = targetString.startsWith('@')
-      ? ['distTag', targetString.slice(1)]
-      : [targetString, 'latest']
+    const targetString = isString(targetOption) ? targetOption : targetOption(name, parseRange(version))
+    const isOrga = targetString[0] === '@'
+    const [target, distTag] = isOrga ? ['distTag', targetString.slice(1)] : [targetString, 'latest']
 
-    const cached = options.cacher?.get(name, target)
+    const cached = cacher?.get(name, target)
     if (cached) {
       bar?.tick()
 
@@ -84,7 +89,7 @@ async function queryVersions(packageMap: Index<VersionSpec>, options: Options = 
         distTag,
         // upgrade prereleases to newer prereleases by default
         // allow downgrading when explicit tag is used
-        pre: options.pre != null ? options.pre : targetString.startsWith('@') || isPre(version),
+        pre: options.pre != null ? options.pre : isOrga || isPre(version),
         retry: options.retry ?? 2,
       })
 
@@ -94,7 +99,7 @@ async function queryVersions(packageMap: Index<VersionSpec>, options: Options = 
           : (versionResult?.version ?? null)
     } catch (err: any) {
       const errorMessage = err ? (err.message || err).toString() : ''
-      if (errorMessage.match(/E400|E404|ENOTFOUND|404 Not Found|400 Bad Request/i)) {
+      if (is404Error(errorMessage)) {
         return {
           error: `${errorMessage.replace(/ - Not found$/i, '')}. All ${
             options.retry
@@ -102,7 +107,7 @@ async function queryVersions(packageMap: Index<VersionSpec>, options: Options = 
         }
       } else {
         // print a hint about the --timeout option for network timeout errors
-        if (!process.env.NCU_TESTS && /(Response|network) timeout/i.test(errorMessage)) {
+        if (!process.env.NCU_TESTS && isTimeoutError(errorMessage)) {
           console.error(
             '\n\n' +
               chalk.red(
@@ -119,7 +124,7 @@ async function queryVersions(packageMap: Index<VersionSpec>, options: Options = 
     bar?.tick()
 
     if (versionResult.version) {
-      options.cacher?.set(name, target, versionResult.version)
+      cacher?.set(name, target, versionResult.version)
     }
 
     return versionResult
@@ -128,8 +133,10 @@ async function queryVersions(packageMap: Index<VersionSpec>, options: Options = 
   const versionResultList = await pMap(packageList, getPackageVersionProtected, { concurrency: options.concurrency })
 
   // save cacher only after pMap handles cacher.set
-  await options.cacher?.save()
-  options.cacher?.log()
+  if (cacher) {
+    await cacher.save()
+    cacher.log()
+  }
 
   const versionResultObject = keyValueBy(versionResultList, (versionResult, i) =>
     versionResult.version || versionResult.error
@@ -141,5 +148,3 @@ async function queryVersions(packageMap: Index<VersionSpec>, options: Options = 
 
   return versionResultObject
 }
-
-export default queryVersions

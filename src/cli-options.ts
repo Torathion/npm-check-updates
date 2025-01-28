@@ -3,7 +3,7 @@ import { defaultCacheFile } from './lib/cache'
 import chalk from './lib/chalk'
 import { sortBy } from './lib/sortBy'
 import table from './lib/table'
-import { codeInlineIfMarkdown, getHighlightedKeywords, indentText } from './lib/utils/string'
+import { codeInlineIfMarkdown, getHighlightedKeywords, indentText, uncode } from './lib/utils/string'
 import CLIOption from './types/CLIOption'
 import ExtendedHelp from './types/ExtendedHelp'
 import { Index } from './types/IndexType'
@@ -14,9 +14,6 @@ const supportedVersionTargets = ['latest', 'newest', 'greatest', 'minor', 'patch
 /** Formats a code block for CLI or markdown. */
 const codeBlock = (code: string, markdown?: boolean) =>
   `${markdown ? '```js\n' : ''}${indentText(code, markdown ? 0 : 4)}${markdown ? '\n```' : ''}`
-
-/** Removes inline code ticks. */
-const uncode = (s: string) => s.replace(/`/g, '')
 
 /** Renders the extended help for an option with usage information. */
 export const renderExtendedHelp = (option: CLIOption, { markdown }: { markdown?: boolean } = {}) => {
@@ -530,6 +527,7 @@ As a comparison: without using the \`--peer\` option, ncu will suggest the lates
 `
 }
 
+/** Number parse function for number options. */
 const parseIntMapper = (s: string) => parseInt(s, 10)
 
 // store CLI options separately from bin file so that they can be used to build type definitions

@@ -3,13 +3,7 @@ import { Options } from '../types/Options'
 import { PackageFile } from '../types/PackageFile'
 import { VersionSpec } from '../types/VersionSpec'
 import resolveDepSections from './resolveDepSections'
-
-/**
- * @returns String safe for use in `new RegExp()`
- */
-function escapeRegexp(s: string) {
-  return s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') // Thanks Stack Overflow!
-}
+import { escapeRegex } from './utils/string'
 
 /**
  * Upgrade the dependency declarations in the package data.
@@ -20,7 +14,7 @@ function escapeRegexp(s: string) {
  * @returns The updated package data, as utf8 text
  * @description Side Effect: prompts
  */
-async function upgradePackageData(
+export default async function upgradePackageData(
   pkgData: string,
   current: Index<VersionSpec>,
   upgraded: Index<VersionSpec>,
@@ -31,23 +25,29 @@ async function upgradePackageData(
   const depSections = [...resolveDepSections(options.dep), 'overrides']
 
   // iterate through each dependency section
-  const sectionRegExp = new RegExp(`"(${depSections.join(`|`)})"s*:[^}]*`, 'g')
+  const sectionRegExp = new RegExp(`"(${depSections.join('|')})"s*:[^}]*`, 'g')
   let newPkgData = pkgData.replace(sectionRegExp, section => {
-    // replace each upgraded dependency in the section
-    Object.keys(upgraded).forEach(dep => {
-      // const expression = `"${dep}"\\s*:\\s*"(${escapeRegexp(current[dep])})"`
-      const expression = `"${dep}"\\s*:\\s*("|{\\s*"."\\s*:\\s*")(${escapeRegexp(current[dep])})"`
-      const regExp = new RegExp(expression, 'g')
-      section = section.replace(regExp, (match, child) => `"${dep}${child ? `": ${child}` : ': '}${upgraded[dep]}"`)
-    })
+    // Some package.json files might have the same dependency in multiple sections, cache them.
+    const regexCache: Record<string, RegExp> = {}
 
+    // replace each upgraded dependency in the section
+    for (const dep of Object.keys(upgraded)) {
+      // Cache the regex to avoid recompilation
+      if (!regexCache[dep]) {
+        regexCache[dep] = new RegExp(`"${dep}"\\s*:\\s*("|{\\s*"."\\s*:\\s*")(${escapeRegex(current[dep])})"`, 'g')
+      }
+
+      section = section.replace(regexCache[dep], (match, child) => {
+        return `"${dep}${child ? `": ${child}` : ': '}${upgraded[dep]}"`
+      })
+    }
     return section
   })
 
   if (depSections.includes('packageManager')) {
     const pkg = JSON.parse(pkgData) as PackageFile
     if (pkg.packageManager) {
-      const [name] = pkg.packageManager.split('@')
+      const name = pkg.packageManager.split('@')[0]
       if (upgraded[name]) {
         newPkgData = newPkgData.replace(
           /"packageManager"\s*:\s*".*?@[^"]*"/,
@@ -59,5 +59,3 @@ async function upgradePackageData(
 
   return newPkgData
 }
-
-export default upgradePackageData

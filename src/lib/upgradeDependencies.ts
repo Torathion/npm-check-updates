@@ -8,6 +8,7 @@ import filterObject from './filterObject'
 import getPreferredWildcard from './getPreferredWildcard'
 import isUpgradeable from './isUpgradeable'
 import { pickBy } from './pick'
+import { isString } from './utils/string'
 import * as versionUtil from './version-util'
 
 interface UpgradeSpec {
@@ -36,7 +37,7 @@ function upgradeDependencies(
   currentDependencies = filterObject(currentDependencies, (key, value) => !!value)
 
   // get the preferred wildcard and bind it to upgradeDependencyDeclaration
-  const wildcard = getPreferredWildcard(currentDependencies) || versionUtil.DEFAULT_WILDCARD
+  const wildcard = getPreferredWildcard(currentDependencies) ?? versionUtil.DEFAULT_WILDCARD
 
   /** Upgrades a single dependency. */
   const upgradeDep = (current: VersionSpec, latest: Version) =>
@@ -86,14 +87,14 @@ function upgradeDependencies(
         // allow downgrades from prereleases when explicit tag is given
         const downgrade: boolean =
           versionUtil.isPre(current) &&
-          (typeof targetOption === 'string' ? targetOption : targetOption(name, parseRange(current))).startsWith('@')
-        return isUpgradeable(currentParsed || current, latestParsed || latest, { downgrade })
+          (isString(targetOption) ? targetOption : targetOption(name, parseRange(current)))[0] === '@'
+        return isUpgradeable(currentParsed ?? current, latestParsed ?? latest, { downgrade })
       }),
     // pack embedded versions: npm aliases and git urls
     (deps: Index<UpgradeSpec>): Index<Version | null> =>
       Object.entries(deps).reduce<Index<Version | null>>(
         (acc, [packageName, { current, currentParsed, latest, latestParsed }]) => {
-          const upgraded = upgradeDep(currentParsed || current, latestParsed || latest)
+          const upgraded = upgradeDep(currentParsed ?? current, latestParsed ?? latest)
 
           acc[packageName] = versionUtil.isNpmAlias(current)
             ? versionUtil.upgradeNpmAlias(current, upgraded)

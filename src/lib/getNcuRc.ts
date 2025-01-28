@@ -5,6 +5,7 @@ import { cliOptionsMap } from '../cli-options'
 import { Options } from '../types/Options'
 import { RcOptions } from '../types/RcOptions'
 import programError from './programError'
+import { isString } from './utils/string'
 
 /** Loads the .ncurc config file. */
 async function getNcuRc({
@@ -37,9 +38,9 @@ async function getNcuRc({
   }
 
   // convert the config to valid options by removing $schema and parsing format
-  const { $schema: _, ...rawConfig } = rawResult?.config || {}
+  const { $schema: _, ...rawConfig } = rawResult?.config ?? {}
   const config: Options = rawConfig
-  if (typeof config.format === 'string') config.format = cliOptionsMap.format.parse!(config.format)
+  if (isString(config.format)) config.format = cliOptionsMap.format.parse!(config.format)
 
   // validate arguments here to provide a better error message
   const unknownOptions = Object.keys(config).filter(arg => !cliOptionsMap[arg])

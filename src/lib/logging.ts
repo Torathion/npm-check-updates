@@ -1,7 +1,7 @@
 /**
  * Loggin functions.
  */
-import Table from 'cli-table3'
+import Table, { TableConstructorOptions } from 'cli-table3'
 import { IgnoredUpgradeDueToEnginesNode } from '../types/IgnoredUpgradeDueToEnginesNode'
 import { IgnoredUpgradeDueToPeerDeps } from '../types/IgnoredUpgradeDueToPeerDeps'
 import { Index } from '../types/IndexType'
@@ -12,6 +12,7 @@ import chalk from './chalk'
 import filterObject from './filterObject'
 import getPackageVersion from './getPackageVersion'
 import getRepoUrl from './getRepoUrl'
+import { trimEndAll } from './utils/string'
 import {
   colorizeDiff,
   getDependencyGroups,
@@ -32,6 +33,27 @@ const logLevels = {
   info: 4,
   verbose: 5,
   silly: 6,
+}
+
+const TableStyle: TableConstructorOptions = {
+  colAligns: ['left', 'right', 'right', 'right', 'left', 'left'],
+  chars: {
+    top: '',
+    'top-mid': '',
+    'top-left': '',
+    'top-right': '',
+    bottom: '',
+    'bottom-mid': '',
+    'bottom-left': '',
+    'bottom-right': '',
+    left: '',
+    'left-mid': '',
+    mid: '',
+    'mid-mid': '',
+    right: '',
+    'right-mid': '',
+    middle: '',
+  },
 }
 
 /** Returns true if the dependency spec is not fetchable from the registry and is ignored. */
@@ -97,37 +119,14 @@ export function printSorted<T extends { [key: string]: any }>(options: Options, 
 
 /** Create a table with the appropriate columns and alignment to render dependency upgrades. */
 function renderDependencyTable(rows: string[][]) {
-  const table = new Table({
-    colAligns: ['left', 'right', 'right', 'right', 'left', 'left'],
-    chars: {
-      top: '',
-      'top-mid': '',
-      'top-left': '',
-      'top-right': '',
-      bottom: '',
-      'bottom-mid': '',
-      'bottom-left': '',
-      'bottom-right': '',
-      left: '',
-      'left-mid': '',
-      mid: '',
-      'mid-mid': '',
-      right: '',
-      'right-mid': '',
-      middle: '',
-    },
-  })
+  const table = new Table(TableStyle)
 
-  table.push(...rows)
+  table.concat(rows)
 
   // when border is removed, whitespace remains
   // trim the end of each line to remove whitespace
   // this makes no difference visually, but the whitespace interacts poorly with .editorconfig in tests
-  return table
-    .toString()
-    .split('\n')
-    .map(line => line.trimEnd())
-    .join('\n')
+  return trimEndAll(table.toString())
 }
 
 /**
@@ -170,9 +169,8 @@ export async function toDependencyTable({
         .sort()
         .map(async dep => {
           const from =
-            (format?.includes('installedVersion')
-              ? await getPackageVersion(dep, undefined, { pkgFile })
-              : fromDeps[dep]) || ''
+            (format?.includes('installedVersion') ? await getPackageVersion(dep, undefined, pkgFile) : fromDeps[dep]) ??
+            ''
           const toRaw = toDeps[dep] || ''
           const to = getVersion(toRaw)
           const ownerChanged = ownersChangedDeps
@@ -183,7 +181,7 @@ export async function toDependencyTable({
               : '*unknown*'
             : ''
           const toColorized = colorizeDiff(getVersion(from), to)
-          const repoUrl = format?.includes('repo') ? (await getRepoUrl(dep, undefined, { pkgFile })) || '' : ''
+          const repoUrl = format?.includes('repo') ? ((await getRepoUrl(dep, undefined, pkgFile)) ?? '') : ''
           const publishTime = format?.includes('time') && time?.[dep] ? time[dep] : ''
           return [dep, from, '→', toColorized, ownerChanged, ...[repoUrl, publishTime].filter(x => x)]
         }),
@@ -258,29 +256,8 @@ export async function printUpgradesTable(
 function printErrors(options: Options, errors?: Index<string>) {
   if (!errors) return
   if (Object.keys(errors).length > 0) {
-    const errorTable = new Table({
-      colAligns: ['left', 'right', 'right', 'right', 'left', 'left'],
-      chars: {
-        top: '',
-        'top-mid': '',
-        'top-left': '',
-        'top-right': '',
-        bottom: '',
-        'bottom-mid': '',
-        'bottom-left': '',
-        'bottom-right': '',
-        left: '',
-        'left-mid': '',
-        mid: '',
-        'mid-mid': '',
-        right: '',
-        'right-mid': '',
-        middle: '',
-      },
-    })
-
-    errorTable.push(...Object.entries(errors).map(([dep, error]) => [dep, chalk.yellow(error)]))
-
+    const errorTable = new Table(TableStyle)
+    errorTable.concat(...Object.entries(errors).map(([dep, error]) => [dep, chalk.yellow(error)]))
     print(options, '\n' + errorTable.toString())
   }
 }

@@ -5,6 +5,7 @@ import { parseRange } from 'semver-utils'
 import { FilterPattern } from '../types/FilterPattern'
 import { Maybe } from '../types/Maybe'
 import { VersionSpec } from '../types/VersionSpec'
+import { isString } from './utils/string'
 
 /**
  * Creates a filter function from a given filter string.
@@ -22,9 +23,9 @@ function composeFilter(filterPattern: FilterPattern): (name: string, versionSpec
     predicate = identity
   }
   // string
-  else if (typeof filterPattern === 'string') {
+  else if (isString(filterPattern)) {
     // RegExp string
-    if (filterPattern[0] === '/' && filterPattern.at(-1) === '/') {
+    if (filterPattern[0] === '/' && filterPattern[filterPattern.length - 1] === '/') {
       const regexp = new RegExp(filterPattern.slice(1, -1))
       predicate = (dependencyName: string) => regexp.test(dependencyName)
     }
