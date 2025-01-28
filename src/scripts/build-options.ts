@@ -2,17 +2,15 @@ import fs from 'fs/promises'
 import spawn from 'spawn-please'
 import cliOptions, { renderExtendedHelp } from '../cli-options'
 import { chalkInit } from '../lib/chalk'
+import { wrapHtmlCode } from '../lib/utils/string'
 import CLIOption from '../types/CLIOption'
 
 const INJECT_HEADER =
   '<!-- Do not edit this section by hand. It is auto-generated in build-options.ts. Run "npm run build" or "npm run build:options" to build. -->'
 
-/** Replaces markdown code ticks with <code>...</code> tag. */
-const codeHtml = (code: string) => code.replace(/\b`/g, '</code>').replace(/`/g, '<code>')
-
 /** Replaces the "Options" and "Advanced Options" sections of the README with direct output from "ncu --help". */
 const injectReadme = async () => {
-  const { default: stripAnsi } = await import('strip-ansi')
+  const stripAnsi = (await import('strip-ansi')).default
   let readme = await fs.readFile('README.md', 'utf8')
   const optionRows = cliOptions
     .map(option => {
@@ -20,7 +18,7 @@ const injectReadme = async () => {
     <td>${option.help ? `<a href="#${option.long.toLowerCase()}">` : ''}${option.short ? `-${option.short}, ` : ''}${
       option.cli !== false ? '--' : ''
     }${option.long}${option.arg ? ` &lt;${option.arg}&gt;` : ''}${option.help ? '</a>' : ''}</td>
-    <td>${codeHtml(option.description)}${option.default ? ` (default: ${JSON.stringify(option.default)})` : ''}</td>
+    <td>${wrapHtmlCode(option.description)}${option.default ? ` (default: ${JSON.stringify(option.default)})` : ''}</td>
   </tr>`
     })
     .join('\n')
@@ -61,7 +59,7 @@ ${readme.slice(advancedOptionsEnd)}`
 }
 
 /** Renders a single CLI option for a type definition file. */
-const renderOption = (option: CLIOption<unknown>) => {
+const renderOption = (option: CLIOption<unknown>): string => {
   // deepPatternFix needs to be escaped, otherwise it will break the block comment
   const description = option.long === 'deep' ? option.description.replace('**/', '**\\/') : option.description
 
@@ -103,11 +101,9 @@ export interface RunOptions {
 }
 
 /** Generates a JSON schema for the ncurc file. */
-const generateRunOptionsJsonSchema = async (): Promise<string> => {
+async function generateRunOptionsJsonSchema(): Promise<string> {
   // programmatic usage of typescript-json-schema does not work, at least not straightforwardly.
-  // Use the CLI which works out-of-the-box.
-  const { stdout } = await spawn('typescript-json-schema', ['tsconfig.json', 'RunOptions'])
-  return stdout
+  return (await spawn('typescript-json-schema', ['tsconfig.json', 'RunOptions'])).stdout
 }
 
 ;(async () => {

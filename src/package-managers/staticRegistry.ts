@@ -1,13 +1,11 @@
 import memoize from 'fast-memoize'
 import fs from 'fs/promises'
 import programError from '../lib/programError'
+import { isUrl } from '../lib/utils/string'
 import { GetVersion } from '../types/GetVersion'
 import { Options } from '../types/Options'
 import { StaticRegistry } from '../types/StaticRegistry'
 import { Version } from '../types/Version'
-
-/** Returns true if a string is a url. */
-const isUrl = (s: string) => (s && s.startsWith('http://')) || s.startsWith('https://')
 
 /**
  * Returns a registry object given a valid file path or url.
@@ -21,8 +19,7 @@ const readStaticRegistry = async (options: Options): Promise<StaticRegistry> => 
 
   // url
   if (isUrl(path)) {
-    const body = await fetch(path)
-    content = await body.text()
+    content = await (await fetch(path)).text()
   }
   // local path
   else {
@@ -47,6 +44,6 @@ const registryMemoized = memoize(readStaticRegistry)
  * @returns A promise that fulfills to string value or null
  */
 export const latest: GetVersion = async (packageName: string, currentVersion: Version, options?: Options) => {
-  const registry: StaticRegistry = await registryMemoized(options || {})
+  const registry: StaticRegistry = await registryMemoized(options ?? {})
   return { version: registry[packageName] || null }
 }

@@ -58,6 +58,16 @@ export function codeInlineIfMarkdown(text: string, markdown?: boolean): string {
 }
 
 /**
+ * Replaces markdown code ticks with html code elements.
+ *
+ * @param code - target code string
+ * @returns the html wrapped code.
+ */
+export function wrapHtmlCode(code: string): string {
+  return code.replace(/\b`/g, '</code>').replace(/`/g, '<code>')
+}
+
+/**
  * Checks if a given string is a normal word.
  *
  * @param text - target string.
@@ -123,4 +133,60 @@ export function interpolate(text: string, data: Index<string | undefined>): stri
     /\$\{([^:-]+)(?:(:)?-([^}]*))?\}/g,
     (match, key, name, fallbackOnEmpty, fallback) => data[key] ?? (fallbackOnEmpty ? fallback : ''),
   )
+}
+
+const termLineLength = Math.min(process.stdout.columns, 92)
+
+/**
+ * Wraps a string by inserting new lines every `n` character. Also wraps on word break.
+ *
+ * @param text - target text.
+ * @param lineLength - maximum character length per line. Default: `92`.
+ * @returns the wrapped text.
+ */
+export function wrap(text: string, lineLength = termLineLength): string {
+  if (!text) return text
+  const linesIn = text.split('\n')
+  const linesOut: string[] = []
+
+  for (const lineIn of linesIn) {
+    const lineInLen = lineIn.length
+    if (lineIn.length === 0) {
+      linesOut.push('')
+      continue
+    }
+
+    let i = 0
+    while (i < lineInLen) {
+      const lineFull = lineIn.substring(i, i + lineLength + 1)
+      const len = lineFull.length
+
+      // If the line is within the line length, push it as the last line and break
+      const lineTrimmed = lineFull.trimEnd()
+      if (lineTrimmed.length <= lineLength) {
+        linesOut.push(lineTrimmed)
+        break
+      }
+
+      // Otherwise, wrap before the last word that exceeds the wrap length
+      // Do not wrap in the middle of a word
+      let wrapOffset = 0
+      for (let j = len - 1; j >= 0; j--) {
+        if (lineFull[j] === ' ' || lineFull[j] === '-') {
+          wrapOffset = len - j - 1
+          break
+        }
+      }
+
+      const line = lineFull.substring(0, len - wrapOffset)
+
+      // Make sure we do not end up in an infinite loop
+      if (line.length === 0) break
+
+      linesOut.push(line.trimEnd())
+      i += line.length
+    }
+  }
+
+  return linesOut.join('\n').trim()
 }

@@ -14,6 +14,7 @@ import { keyValueBy } from '../lib/keyValueBy'
 import libnpmconfig from '../lib/libnpmconfig'
 import { print, printSorted } from '../lib/logging'
 import { sortBy } from '../lib/sortBy'
+import { isString, stripKebabCase } from '../lib/utils/string'
 import * as versionUtil from '../lib/version-util'
 import { GetVersion } from '../types/GetVersion'
 import { Index } from '../types/IndexType'
@@ -232,20 +233,19 @@ export const normalizeNpmConfig = (
   // See: https://github.com/zkat/pacote/issues/156
   const config: NpmConfig = keyValueBy(npmConfig, (key: string, value: NpmConfig[keyof NpmConfig]) => {
     // replace env ${VARS} in strings with the process.env value
-    const normalizedValue =
-      typeof value !== 'string'
-        ? value
-        : // parse stringified booleans
-          keyTypes[key.replace(/-/g, '').toLowerCase()] === 'boolean'
-          ? stringToBoolean(value)
-          : keyTypes[key.replace(/-/g, '').toLowerCase()] === 'number'
-            ? stringToNumber(value)
-            : value.replace(/\${([^}]+)}/, (_, envVar) => process.env[envVar] as string)
+    const normalizedValue = !isString(value)
+      ? value
+      : // parse stringified booleans
+        keyTypes[stripKebabCase(key)] === 'boolean'
+        ? stringToBoolean(value)
+        : keyTypes[stripKebabCase(key)] === 'number'
+          ? stringToNumber(value)
+          : value.replace(/\${([^}]+)}/, (_, envVar) => process.env[envVar] as string)
 
     // normalize the key for pacote
     const { [key]: pacoteKey }: Index<NpmConfig[keyof NpmConfig]> = npmConfigToPacoteMap
 
-    return typeof pacoteKey === 'string'
+    return isString(pacoteKey)
       ? // key is mapped to a string
         { [pacoteKey]: normalizedValue }
       : // key is mapped to a function
@@ -335,13 +335,12 @@ export async function packageAuthorChanged(
     ...(options.registry ? { registry: options.registry, silent: true } : null),
   })
   if (result.versions) {
-    const pkgVersions = Object.keys(result.versions)
+    const versions = result.versions
+    const pkgVersions = Object.keys(versions)
     const current = nodeSemver.minSatisfying(pkgVersions, currentVersion)
     const upgraded = nodeSemver.maxSatisfying(pkgVersions, upgradedVersion)
-    if (current && upgraded && result.versions[current]._npmUser && result.versions[upgraded]._npmUser) {
-      const currentAuthor = result.versions[current]._npmUser?.name
-      const latestAuthor = result.versions[upgraded]._npmUser?.name
-      return currentAuthor !== latestAuthor
+    if (current && upgraded && versions[current]._npmUser && versions[upgraded]._npmUser) {
+      return versions[current]._npmUser?.name !== versions[upgraded]._npmUser?.name
     }
   }
 
@@ -359,7 +358,7 @@ export const mockFetchUpgradedPackument =
     const partialPackument =
       typeof mockReturnedVersions === 'function'
         ? mockReturnedVersions(options)?.[name]
-        : typeof mockReturnedVersions === 'string' || isPackument(mockReturnedVersions)
+        : isString(mockReturnedVersions) || isPackument(mockReturnedVersions)
           ? mockReturnedVersions
           : mockReturnedVersions[name]
 
@@ -415,8 +414,8 @@ const mergeNpmConfigs = memoize(
     options: Options,
   ) => {
     // merge project npm config with base config
-    const npmConfigProjectPath = options.packageFile ? path.join(options.packageFile, '../.npmrc') : null
-    const npmConfigProject = options.packageFile ? findNpmConfig(npmConfigProjectPath || undefined) : null
+    const npmConfigProjectPath = options.packageFile ? path.join(options.packageFile, '../.npmrc') : undefined
+    const npmConfigProject = options.packageFile ? findNpmConfig(npmConfigProjectPath) : null
     const npmConfigCWDPath = options.cwd ? path.join(options.cwd, '.npmrc') : null
     const npmConfigCWD = options.cwd ? findNpmConfig(npmConfigCWDPath!) : null
 
@@ -498,7 +497,7 @@ async function fetchUpgradedPackument(
   }
 
   if (isExactVersion(currentVersion)) {
-    return Promise.resolve({} as Index<Packument>)
+    return {}
   }
 
   // fields may already include time
@@ -579,7 +578,7 @@ export const fetchUpgradedPackumentMemo = memoize(fetchUpgradedPackument, {
  * @param [spawnOptions={}]
  * @returns
  */
-async function spawnNpm(
+export default async function spawnNpm(
   args: string | string[],
   npmOptions: NpmOptions = {},
   spawnPleaseOptions: SpawnPleaseOptions = {},
@@ -950,5 +949,3 @@ export const semver: GetVersion = async (
   const version = nodeSemver.maxSatisfying(versionsFiltered, currentVersion)
   return { version }
 }
-
-export default spawnNpm
